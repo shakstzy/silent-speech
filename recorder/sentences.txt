@@ -1,0 +1,60 @@
+Please put the groceries on the kitchen table.
+What time does the meeting start tomorrow morning?
+I think it is going to rain this afternoon.
+Can you send me the address when you get a chance?
+We should leave early so we miss the traffic.
+The coffee here is better than the place downtown.
+Turn off the lights before you go to bed.
+She forgot her umbrella on the train again.
+Let us meet at the park around six.
+My phone is almost out of battery.
+Could you open the window a little bit?
+He walked the dog along the river every evening.
+Call me back as soon as you are free.
+I will be there in about ten minutes.
+Save the file and close the window.
+Please stop the timer right now.
+Open the front door for me.
+Play the next song on the list.
+Send the message to him now.
+Go back to the last page.
+Set an alarm for seven in the morning.
+Read my new emails out loud.
+Scroll down a little bit more.
+Take a picture and save it to my desktop.
+Git commit with the message fix login bug.
+Run the tests and show me what failed.
+Open a pull request against the main branch.
+Push my changes to the remote repository.
+Create a new branch called feature login page.
+Merge the latest main into this branch.
+The build is failing because of a missing dependency.
+Add a unit test for the parser function.
+Check the logs for any errors from the server.
+Rename this variable to something clearer.
+Deploy the app to staging and watch the output.
+Rebase on main and resolve the conflicts.
+This function returns null when the list is empty.
+Revert the last commit and run the tests again.
+Install the package and restart the dev server.
+Can you review my code before lunch?
+The API call times out after thirty seconds.
+Format the code and fix the lint warnings.
+Write a short summary of what changed in this commit.
+Let me check the status of the working tree.
+The database migration finished without any errors.
+Show me the diff for the file I just edited.
+Remember to update the readme before you merge.
+I need a quiet place to finish this report.
+The train to Boston leaves at a quarter past nine.
+Thanks for the help, I really appreciate it.
+It was a long week and I am ready to relax.
+Please bring a jacket because it gets cold at night.
+Where did you park the car this morning?
+We are out of milk, eggs, and bread.
+The movie starts at eight, so do not be late.
+Look at the screen and read the next line.
+Good morning, how did you sleep last night?
+I would like a large cup of tea, please.
+Go ahead and start the next recording.
+The weather looks great for a walk today.

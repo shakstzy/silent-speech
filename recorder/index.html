@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clip Recorder</title>
+<style>
+:root{color-scheme:dark;--bg:#111;--fg:#f3f3f3;--mut:#999;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 -apple-system,system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px;gap:14px}
+#top{width:100%;max-width:900px;display:flex;justify-content:space-between;color:var(--mut);font-size:14px}
+#mode{cursor:pointer;border:1px solid var(--mut);border-radius:6px;padding:2px 10px;background:none;color:var(--fg);font:inherit}
+#prompt{font-size:clamp(28px,5vw,52px);font-weight:600;text-align:center;max-width:900px;min-height:2.6em;display:flex;align-items:center}
+#stage{position:relative;width:640px;max-width:100%;aspect-ratio:4/3;background:#000;border-radius:10px;overflow:hidden}
+video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#count{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:140px;font-weight:700;text-shadow:0 0 20px #000}
+#rec{position:absolute;top:10px;left:12px;display:none;color:var(--bad);font-weight:700}
+#warn{position:absolute;bottom:8px;left:0;right:0;text-align:center;color:var(--warn);font-weight:600;display:none;text-shadow:0 0 6px #000}
+#help{font-size:20px;text-align:center;min-height:2em}
+#hint{color:var(--mut);font-size:14px;text-align:center}
+#msg{color:var(--mut);min-height:1.4em;text-align:center}
+kbd{background:#333;border-radius:4px;padding:1px 8px;font:inherit;font-weight:600}
+</style></head><body>
+<div id="top"><span id="prog">loading</span><button id="mode" title="press M"></button></div>
+<div id="prompt"></div>
+<div id="stage"><video id="v" playsinline muted></video>
+<svg viewBox="0 0 640 480"><path id="mask" fill="rgba(0,0,0,.45)" fill-rule="evenodd" d="M0 0H640V480H0Z M320 45a135 195 0 1 0 .01 0Z"/><ellipse cx="320" cy="240" rx="135" ry="195" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="8 6" id="oval"/></svg>
+<div id="count"></div><div id="rec">&#9679; REC <span id="t">0.0</span>s</div><div id="warn">Too dark: face a light or turn one on</div></div>
+<div id="hint">Fill the oval, mouth every word a little bigger than feels natural</div><div id="help"></div><div id="msg"></div>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const v=$("v"),help=$("help"),msg=$("msg");
+let sentences=[],idx=0,mode="mouthed",state="init",stream,rec,chunks=[],blob,blobUrl,startT=0,tick;
+const store={get(k,d){try{return localStorage.getItem(k)??d}catch(e){return d}},set(k,x){try{localStorage.setItem(k,x)}catch(e){}}};
+const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];
+const mime=types.find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t))||"";
+
+function render(){
+  $("mode").textContent="Mode: "+mode+" (M)";
+  $("prog").textContent=sentences.length?`Sentence ${idx+1} / ${sentences.length}`:"";
+  $("prompt").textContent=sentences[idx]||"";
+  const h={idle:`Press <kbd>SPACE</kbd> to start, press <kbd>SPACE</kbd> again to stop`,
+   count:"Get ready...",rec:`Recording. Press <kbd>SPACE</kbd> to stop`,
+   review:`<kbd>ENTER</kbd> keep &nbsp; <kbd>R</kbd> redo`,up:"Uploading...",err:`Upload failed. <kbd>ENTER</kbd> retry &nbsp; <kbd>R</kbd> discard`,
+   done:"All sentences recorded. Thank you.",init:""}[state];
+  help.innerHTML=h;
+  $("rec").style.display=state==="rec"?"block":"none";
+}
+function say(s){msg.textContent=s||""}
+
+async function init(){
+  if(!mime){say("This browser has no usable MediaRecorder format.");return}
+  try{
+    const txt=await (await fetch("sentences.txt")).text();
+    sentences=txt.split("\n").map(s=>s.trim()).filter(Boolean);
+  }catch(e){say("Could not load sentences.txt");return}
+  idx=Math.min(parseInt(store.get("idx","0"))||0,sentences.length);
+  mode=store.get("mode","mouthed");
+  if(!navigator.mediaDevices){say("Camera needs a secure context (https or localhost).");return}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30},facingMode:"user"}});
+  }catch(e){say("Camera error: "+e.message);return}
+  v.srcObject=stream;await v.play();
+  const s=stream.getVideoTracks()[0].getSettings();res=`${s.width}x${s.height}`;
+  say(`Camera ${s.width}x${s.height} @ ${Math.round(s.frameRate||0)} fps, recording ${mime}`);
+  setInterval(luma,500);
+  go(idx>=sentences.length?"done":"idle");
+}
+function go(s){state=s;render()}
+
+const cv=document.createElement("canvas");cv.width=64;cv.height=48;const cx=cv.getContext("2d",{willReadFrequently:true});
+function luma(){
+  if(!v.videoWidth||state==="review")return;
+  cx.drawImage(v,0,0,64,48);const d=cx.getImageData(0,0,64,48).data;let sum=0;
+  for(let i=0;i<d.length;i+=4)sum+=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2];
+  const m=sum/(d.length/4);$("warn").style.display=m<70?"block":"none";
+}
+
+function countdown(){
+  go("count");let n=3;const c=$("count");c.style.display="flex";c.textContent=n;
+  const iv=setInterval(()=>{n--;if(n>0){c.textContent=n}else{clearInterval(iv);c.style.display="none";startRec()}},1000);
+}
+function startRec(){
+  chunks=[];rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4000000});
+  rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  rec.onstop=()=>{clearInterval(tick);
+    blob=new Blob(chunks,{type:rec.mimeType.split(";")[0]});
+    if(Date.now()-startT<500){say("Too short, try again.");return go("idle")}
+    if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(blob);
+    v.srcObject=null;v.src=blobUrl;v.muted=true;v.loop=true;v.play();
+    say(`Clip ${(blob.size/1024).toFixed(0)} KB`);go("review")};
+  rec.start(200);startT=Date.now();
+  tick=setInterval(()=>$("t").textContent=((Date.now()-startT)/1000).toFixed(1),100);
+  go("rec");
+}
+function backToLive(){v.pause();v.removeAttribute("src");v.loop=false;v.srcObject=stream;v.play()}
+function newId(){const d=new Date(),p=n=>String(n).padStart(2,"0");
+  return `c${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2,6)}`}
+let curId=null,res="";
+async function upload(){
+  go("up");curId=curId||newId();
+  try{
+    const q=new URLSearchParams({id:curId,text:sentences[idx],mode,res});
+    const r=await fetch("upload?"+q,{method:"POST",headers:{"Content-Type":blob.type},body:blob});
+    if(!r.ok)throw new Error(await r.text());
+    curId=null;idx++;store.set("idx",idx);backToLive();say("Saved.");
+    go(idx>=sentences.length?"done":"idle");
+  }catch(e){say("Upload error: "+e.message);go("err")}
+}
+function redo(){curId=null;backToLive();say("");go("idle")}
+
+addEventListener("keydown",e=>{
+  if(e.repeat)return;
+  const k=e.key.toLowerCase();
+  if(k==="m"&&(state==="idle")){mode=mode==="mouthed"?"spoken":"mouthed";store.set("mode",mode);render();return}
+  if(e.code==="Space"){e.preventDefault();
+    if(state==="idle"){say("");countdown()}else if(state==="rec"){state="stopping";setTimeout(()=>rec.stop(),300)}return}
+  if((state==="review"||state==="err")&&e.key==="Enter")upload();
+  if((state==="review"||state==="err")&&k==="r")redo();
+});
+$("mode").onclick=()=>{if(state==="idle"){mode=mode==="mouthed"?"spoken":"mouthed";store.set("mode",mode);render()}};
+init();
+</script></body></html>
